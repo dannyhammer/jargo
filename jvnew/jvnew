@@ -1,0 +1,90 @@
+#!/bin/bash
+
+# Java Project Creator
+#
+# A simple script to create a new Java program
+#
+# Author: Daniel Hammer
+# Date: 2021-04-19
+#
+# Exit codes:
+# 0 - Program success
+# 1 - Insufficient usage
+# 2 - Invalid flag provided
+# 2 - Project name already exists
+
+
+# Check minimum args
+if [ $# -lt 1 ]; then
+    echo "usage: jvnew <project name> [package name] [driver name]"
+    exit 1
+fi
+
+
+# Setup default variables
+name=$1; shift # consume the first command line argument
+package="App"
+driver="Driver"
+
+# Iterate over the remaining args
+while (($#)); do
+    case $1 in
+        "-p") # Change primary package name
+            shift
+            package=$1
+            ;;
+
+        "-d") # Change driver filename
+            shift
+            driver=$1
+            ;;
+
+        *) # Unknown arg
+            echo "Error: Unknown flag \`$1\`"
+            exit 2
+            ;;
+    esac
+
+    # Iterate through command line args
+    shift
+done
+
+# If the directory already exists, throw an error
+if [ -d "$name" ]; then
+    echo "Error: $name already exists"
+    exit 2
+fi
+
+# Set up directory structure
+mkdir -p $name/src/$package
+mkdir -p $name/bin
+
+
+# Get current system time
+time=$(date +"%Y-%m-%d %T")
+
+# Set up Main class
+echo "package $package;
+
+/**
+ * Driver Class.
+ *
+ * @author $USER
+ * @version $time
+ */
+public class $driver {
+    public static void main(String[] args) {
+        System.out.println(\"Hello, world!\");
+    }
+}" > $name/src/$package/$driver.java
+
+# Set up README.md
+echo "# Title" > $name/README.md
+
+# Initialize Git repository
+git init $name/ > /dev/null
+
+
+# End
+echo "Created new Java project: $name"
+exit 0
