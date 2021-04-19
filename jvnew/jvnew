@@ -11,7 +11,7 @@
 # 0 - Program success
 # 1 - Insufficient usage
 # 2 - Invalid flag provided
-# 2 - Project name already exists
+# 3 - Project name already exists
 
 
 # Check minimum args
@@ -20,11 +20,11 @@ if [ $# -lt 1 ]; then
     exit 1
 fi
 
-
 # Setup default variables
 name=$1; shift # consume the first command line argument
 package="App"
 driver="Driver"
+git=1
 
 # Iterate over the remaining args
 while (($#)); do
@@ -37,6 +37,11 @@ while (($#)); do
         "-d") # Change driver filename
             shift
             driver=$1
+            ;;
+
+        "--no-git") # Do not initialize a git repository
+            shift
+            git=0
             ;;
 
         *) # Unknown arg
@@ -52,7 +57,7 @@ done
 # If the directory already exists, throw an error
 if [ -d "$name" ]; then
     echo "Error: $name already exists"
-    exit 2
+    exit 3
 fi
 
 # Set up directory structure
@@ -81,10 +86,13 @@ public class $driver {
 # Set up README.md
 echo "# Title" > $name/README.md
 
-# Initialize Git repository
-git init $name/ > /dev/null
-
+# Initialize Git repository (if not disabled)
+if [ $git -eq 1 ]; then
+    git init $name/ > /dev/null
+    echo "*.class" > $name/.gitignore
+    echo "bin/" >> $name/.gitignore
+fi
 
 # End
-echo "Created new Java project: $name"
+echo "Created new Java project: \"$name\""
 exit 0
