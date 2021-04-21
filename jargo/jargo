@@ -115,7 +115,7 @@ new() {
 
     # Ensure a project name was passed in
     if [ -z "$name" ]; then
-        echo "usage: jargo new <NAME> [ARGS]"
+        echo "usage: jargo new <NAME> [OPTIONS]"
         shutdown 3
     fi
 
