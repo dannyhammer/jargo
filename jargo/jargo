@@ -1,0 +1,338 @@
+#!/bin/bash
+
+# Jargo - Java Project Manager
+#
+# A simple script to manage a Java project
+#
+# Author: Daniel Hammer
+# Date: 2021-04-21
+#
+# Exit codes:
+# 0 - Program success
+# 1 - Insufficient usage
+# 2 - Unknown command passed to Jargo
+# 3 - No name supplied during project creation
+# 4 - Supplied invalid name during project creation
+# 5 - Supplied invalid argument during project creation
+
+########## GLOBAL VARIABLES ###########
+
+# Project configuration file
+CONFIG="jargo.cfg"
+
+# Project name
+name=""
+
+# Name of package where driver resides
+package=""
+
+# Name of driver file
+driver=""
+
+#######################################
+
+# Initialize globals
+if [ -r "$CONFIG" ]; then
+    name=$(awk -F: '/name/ { print $2 }' $CONFIG)
+    package=$(awk -F: '/package/ { print $2 }' $CONFIG)
+    driver=$(awk -F: '/driver/ { print $2 }' $CONFIG)
+else
+    name="$USERJavaProject"
+    package="App"
+    driver="Main"
+fi
+
+################################################################################
+# Displays usage message
+################################################################################
+usage() {
+    echo "usage: jargo <COMMAND> [OPTIONS]"
+}
+
+################################################################################
+# Handles graceful cleanup and shutdown
+#
+# Arguments:
+#   $1: Error code to exit with
+################################################################################
+shutdown() {
+    # Debug printing
+    #echo "Exiting with error code $1"
+    exit $1
+}
+
+################################################################################
+# Handles creation of new project
+#
+# Globals:
+#   name: Project directory name
+#   package: Package name where the driver resides
+#   driver: Name of the driver file
+#
+# Outputs:
+#   A message displaying that the project was created.
+#
+# Arguments:
+#   $1: Name of project to create
+################################################################################
+new() {
+    # Initialize default configuration variables
+    name=$1
+    git=1
+
+    # Ensure a project name was passed in
+    if [ -z "$name" ]; then
+        echo "usage: jargo new <NAME> [args]"
+        shutdown 3
+    fi
+
+    # If the directory already exists, throw an error
+    if [ -d "$name" ]; then
+        echo "Error: $name already exists"
+        shutdown 4
+    fi
+
+    shift # Consume project name and begin scanning flags
+    while (($#)); do
+        case $1 in
+            "-n") # Change primary package name
+                shift
+                package=$1
+                ;;
+
+            "-d") # Change driver filename
+                shift
+                driver=$1
+                ;;
+
+            "--no-git") # Do not initialize a git repository
+                shift
+                git=0
+                ;;
+
+            *) # Unknown argument
+                echo "Error: Unknown argument \`$1\`"
+                shutdown 5
+                ;;
+        esac
+        
+        shift # Continue looping through arguments
+    done
+
+    # Set up directory structure
+    mkdir -p $name/src/$package
+    mkdir -p $name/bin
+
+    # Create configuration file
+    echo "name:$name
+package:$package
+driver:$driver" > $name/$CONFIG
+
+    # Get current system time
+    time=$(date +"%Y-%m-%d %T")
+
+    # Set up Main class
+    echo "package $package;
+
+/**
+ * Driver Class.
+ *
+ * @author $USER
+ * @version $time
+ */
+public class $driver {
+    public static void main(String[] args) {
+        System.out.println(\"Hello, world!\");
+    }
+}" > $name/src/$package/$driver.java
+
+    # Set up README.md
+    echo "# Title" > $name/README.md
+
+    # Initialize Git repository (if not disabled)
+    if [ $git -eq 1 ]; then
+        git init $name/ > /dev/null
+        echo "*.class" > $name/.gitignore
+        echo "bin/" >> $name/.gitignore
+    fi
+
+    # End
+    echo "Created new Java project: \"$name\""
+}
+
+################################################################################
+# Handles compilation of a project
+#
+# Outputs:
+#   A message displaying that the project was built.
+#
+# Arguments:
+#   ${@}: All compilation arguments
+################################################################################
+build() {
+    # Ensure command was run from project root
+    if [ $(in_root) -ne 1 ]; then
+        echo "Error: \"${PWD##*/}\" not a project root."
+        return
+    fi
+
+    # Only recompile if needed
+    if [ $(needs_rebuild) -eq 1 ]; then
+        javac ${@} -d bin/ src/**/*.java
+
+        # Display compilation message if no errors occurred
+        if [ $? -ne 0 ]; then
+
+            # Display appropriate compilation message
+            if [ ${#@} -gt 0 ]; then
+                echo -e "Compiled $name with args: ${@}\n"
+            else
+                echo -e "Compiled $name\n"
+            fi
+        fi
+    else
+        echo "Project binaries are up to date."
+    fi
+}
+
+################################################################################
+# Handles execution of application
+#
+# Globals:
+#   name: Project directory name
+#   package: Package name where the driver resides
+#   driver: Name of the driver file
+# 
+# Outputs:
+#   A message displaying that the project was ran.
+#
+# Arguments:
+#   ${@}: All command line arguments passed by the user, to be sent to `main()`
+################################################################################
+run() {
+    # Ensure command was run from project root
+    if [ $(in_root) -ne 1 ]; then
+        echo "Error: \"${PWD##*/}\" not a project root."
+        return
+    fi
+
+    # If the project needs to be recompiled, do so.
+    if [ $(needs_rebuild) -eq 1 ]; then
+        build
+    fi
+
+    if [ ${#@} -gt 0 ]; then
+        echo -e "Executing $name with args: ${@}\n"
+    else
+        echo -e "Executing $name\n"
+    fi
+
+    # Execute driver with supplied args
+    java -cp bin/ $package.$driver ${@}
+}
+
+################################################################################
+# Cleans project directory of class files
+# 
+# Outputs:
+#   A message displaying that the project was cleaned.
+################################################################################
+clean() {
+    # Ensure command was run from project root
+    if [ $(in_root) -ne 1 ]; then
+        echo "Error: \"${PWD##*/}\" not a project root."
+        return
+    fi
+
+    # Recursively delete all *.class files in bin/
+    find bin/ -name "*.class" -delete
+
+    echo "Cleaned project."
+}
+
+
+################################################################################
+# Checks if the project needs to be recompiled.
+#
+# Returns
+#   1 if project must be recompiled, else 0.
+################################################################################
+needs_rebuild() {
+    local retval=0
+
+    # Fetch arrays of all files in `bin/` and `src/`
+    bins=($(find bin -type f -exec echo {} \;))
+    srcs=($(find src -type f -exec echo {} \;))
+
+    # If there are fewer binaries than source files, compile
+    if [ ${#bins[@]} -lt ${#srcs[@]} ]; then
+        retval=1
+    fi
+
+    # Loop over both arrays
+    for ((i=0; i<${#bins[@]}; i++)); do
+
+        # If any source file is newer, recompile
+        if [ "${srcs[i]}" -nt "${bins[i]}" ]; then
+            retval=1
+        fi
+    done
+
+    echo $retval
+}
+
+################################################################################
+# Determines if `jargo` was run from a project's root.
+#
+# Globals:
+#   name: Ensure this command is being run from the project root
+#
+# Returns
+#   1 if ran from project root, else 0.
+################################################################################
+in_root() {
+    local retval=0
+
+    # If the working directory is the same as the project's name
+    if [ "${PWD##*/}" == "$name" ]; then
+        retval=1
+    fi
+
+    echo $retval
+}
+
+# Check minimum args
+if [ $# -lt 1 ]; then
+    usage
+    shutdown 1
+fi
+
+# Launch appropriate command
+case $1 in
+    "new") # Create new project
+        shift
+        new ${@}
+        ;;
+
+    "build") # Compile project
+        shift
+        build ${@}
+        ;;
+
+    "run") # Run project
+        shift
+        run ${@}
+        ;;
+
+    "clean") # Clean project
+        shift
+        clean ${@}
+        ;;
+
+    *) # Unknown arg
+        echo "Error: Unknown command \`$1\`"
+        shutdown 2
+        ;;
+esac
+
+exit 0
