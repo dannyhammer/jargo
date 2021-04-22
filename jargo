@@ -303,6 +303,11 @@ clean() {
         return
     fi
 
+    # Delete docs, if requested
+    if [ "$1" = "--doc" ] || [ "$1" = "-d" ]; then
+        rm -rf docs/*
+    fi
+
     # Recursively delete all *.class files in bin/
     find bin/ -name "*.class" -delete
 
