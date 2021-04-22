@@ -6,9 +6,9 @@ A simplified way of managing Java projects
 
 - [Overview](#overview)
   - [Background](#background)
-  - [Benefits](#benefits)
+  - [Features](#features)
 - [Usage](#usage)
-- [Installing](#installing)
+- [Installation](#installation)
 
 ## Overview
 
@@ -48,7 +48,10 @@ Here are a few of the basic commands and options:
 
 ## Installation
 
-Currently, cloning this repository is the only bit of installation necessary.
-Of course, you need Java installed.
+I'll put more in this section once I have this more fleshed out. But for now, here's the steps:
 
-I'll put more in this section once I have this more fleshed out.
+1. Download the `jargo` script
+2. Mark it as executable by `chmod u+x jargo`
+3. Create a symlink so you can execute it anywhere `ln -s /path/to/jargo /usr/local/bin`
+
+Of course, you need Java installed :)

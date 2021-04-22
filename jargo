@@ -207,17 +207,24 @@ public class $driver {
 #
 # Arguments:
 #   ${@}: All compilation arguments
+#
+# Returns:
+#   1 if compilation was successful, else 0
 ################################################################################
 build() {
+    retval=0
+
     # Ensure command was run from project root
     if [ $(in_root) -ne 1 ]; then
         echo "Error: \"${PWD##*/}\" not a project root."
+        echo $retval
         return
     fi
 
     # Only recompile if needed
     if [ $(needs_rebuild) -eq 1 ]; then
-        javac ${@} -d bin/ src/**/*.java
+        find src/ -name "*.java" -print | xargs javac -d bin/
+
 
         # Display compilation message if no errors occurred
         if [ $? -eq 0 ]; then
@@ -228,10 +235,16 @@ build() {
             else
                 echo -e "\t${YELLOW}COMPILED${RESET} $name"
             fi
+
+            # Compilation sucess
+            retval=1
         fi
     else
         echo "Project binaries are up to date."
+        retval=1
     fi
+
+    return $retval
 }
 
 ################################################################################
@@ -255,19 +268,26 @@ run() {
         return
     fi
 
+    # By default, status is OK to run
+    status=1
+
     # If the project needs to be recompiled, do so.
     if [ $(needs_rebuild) -eq 1 ]; then
         build
+        status=$?
     fi
 
-    if [ ${#@} -gt 0 ]; then
-        echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${@}"
-    else
-        echo -e "\t${YELLOW}EXECUTING${RESET} $name"
-    fi
+    # Only execute if compilation was successful
+    if [ $status -eq 1 ]; then
+        if [ ${#@} -gt 0 ]; then
+            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${@}"
+        else
+            echo -e "\t${YELLOW}EXECUTING${RESET} $name"
+        fi
 
-    # Execute driver with supplied args
-    java -cp bin/ $package.$driver ${@}
+        # Execute driver with supplied args
+        java -cp bin/ $package.$driver ${@}
+    fi
 }
 
 ################################################################################
@@ -286,7 +306,7 @@ clean() {
     # Recursively delete all *.class files in bin/
     find bin/ -name "*.class" -delete
 
-    echo "\t${YELLOW}CLEANED${RESET} project binaries."
+    echo -e "\t${YELLOW}CLEANED${RESET} project binaries."
 }
 
 ################################################################################
@@ -300,7 +320,7 @@ doc() {
     fi
 
     # Mute output when documenting, but display errors
-    javadoc -d docs src/**/*.java > /dev/null
+    find src/ -name "*.java" -print | xargs javadoc -d docs > /dev/null
 
 
     echo -e "\t${YELLOW}GENERATED${RESET} docs for project under \`$name/docs/\`"
