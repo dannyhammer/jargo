@@ -13,7 +13,7 @@
 # 2 - Unknown command passed to Jargo
 # 3 - No name supplied during project creation
 # 4 - Supplied invalid name during project creation
-# 5 - Supplied invalid argument during project creation
+# 5 - Supplied invalid argument during project creation/initialization
 
 ########## GLOBAL VARIABLES ###########
 
@@ -389,6 +389,67 @@ add() {
 }
 
 ################################################################################
+# Initializes an existing project to be a Jargo project.
+#
+# Globals:
+#   name: Project root name.
+#   driver: Driver file name.
+#   package: Package name containing driver file.
+#   MODULE: Project module file.
+#
+# Arguments:
+#   ${@}: Initialization flags.
+#
+# Outputs:
+#   A message declaring that the project was initialized.
+################################################################################
+init() {
+    # Default to initializing a git repository
+    local git=1
+    
+    # Get name of current directory
+    name=$(basename $(pwd))
+
+    # Get name of the driver (where main is located)
+    driver=$(grep -lr "public static void main" src/ | xargs basename -s ".java")
+
+    # Get name of the package containing driver
+    package=$(grep -lr "public static void main" src/ | xargs dirname | xargs basename)
+
+    for arg in "${@}"; do
+        case $arg in
+            "--no-git") # Do not initialize a git repository
+                shift
+                git=0
+                ;;
+
+            *) # Unknown argument
+                echo "Error: Unknown argument \`$arg\`"
+                shutdown 5
+                ;;
+        esac
+    done
+
+    # Create configuration file
+    echo "name:$name
+package:$package
+driver:$driver" > $CONFIG
+
+    # Set up README.md
+    echo "# $name " > README.md
+
+    # Initialize Git repository (if not disabled)
+    if [ $git -eq 1 ]; then
+        git init > /dev/null
+        echo "*.class" > .gitignore
+        echo "bin/" >> .gitignore
+        echo "docs/" >> .gitignore
+    fi
+
+    echo -e "\t${YELLOW}INITIALIZED${RESET} Project under \`$name/src/$MODULE\`"
+}
+
+################################################################################
 # Checks if the project needs to be recompiled.
 #
 # Returns
@@ -555,6 +616,11 @@ main () {
         "add") # Adds dependencies to the project
             shift
             add ${@}
+            ;;
+
+        "init") # Initializes an existing project as a Jargo project
+            shift
+            init ${@}
             ;;
 
         "--help" | "-h") # Display help menu
