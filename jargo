@@ -29,6 +29,9 @@ package=""
 # Name of driver file
 driver=""
 
+# Name of primary module file
+MODULE="module-info.java"
+
 # ANSI text colors
 RESET="\e[0m"
 YELLOW="\e[1;33m"
@@ -162,7 +165,7 @@ package:$package
 driver:$driver" > $name/$CONFIG
 
     # Get current system time
-    time=$(date +"%Y-%m-%d %T")
+    local time=$(date +"%Y-%m-%d %T")
 
     # Set up Main class
     echo "package $package;
@@ -183,6 +186,11 @@ public class $driver {
         System.out.println(\"Hello, world!\");
     }
 }" > $name/src/$package/$driver.java
+
+    # Create module file
+    echo "module $name {
+    
+}" > $name/src/$MODULE
 
     # Set up README.md
     echo "# $name " > $name/README.md
@@ -212,7 +220,7 @@ public class $driver {
 #   1 if compilation was successful, else 0
 ################################################################################
 build() {
-    retval=0
+    local retval=0
 
     # Ensure command was run from project root
     if [ $(in_root) -ne 1 ]; then
@@ -223,20 +231,27 @@ build() {
 
     # Only recompile if needed
     if [ $(needs_rebuild) -eq 1 ]; then
-        find src/ -name "*.java" -print | xargs javac -d bin/
 
+
+        # Parse the args and shift
+        local args=$(arg_parser ${@})
+        local shift_amt=$?
+        shift $shift_amt
+
+        # Compile with new args
+        find src/ -name "*.java" -print | xargs javac ${args[@]} -d bin/
 
         # Display compilation message if no errors occurred
         if [ $? -eq 0 ]; then
 
             # Display appropriate compilation message
-            if [ ${#@} -gt 0 ]; then
-                echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${@}"
+            if [ ${#args[@]} -gt 0 ]; then
+                echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${args[@]}"
             else
                 echo -e "\t${YELLOW}COMPILED${RESET} $name"
             fi
 
-            # Compilation sucess
+            # Compilation success
             retval=1
         fi
     else
@@ -269,24 +284,30 @@ run() {
     fi
 
     # By default, status is OK to run
-    status=1
+    local status=1
 
     # If the project needs to be recompiled, do so.
     if [ $(needs_rebuild) -eq 1 ]; then
-        build
+        build ${@}
         status=$?
     fi
 
+    # Parse the args and shift
+    local args=$(arg_parser ${@})
+    local shift_amt=$?
+    shift $shift_amt
+
     # Only execute if compilation was successful
     if [ $status -eq 1 ]; then
-        if [ ${#@} -gt 0 ]; then
-            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${@}"
+        if [ ${#args[@]} -gt 0 ]; then
+            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${args[@]}"
         else
             echo -e "\t${YELLOW}EXECUTING${RESET} $name"
         fi
 
         # Execute driver with supplied args
-        java -cp bin/ $package.$driver ${@}
+        # TODO: Allow user to supply args to the program
+        java ${args[@]} -cp bin/ $package.$driver
     fi
 }
 
@@ -329,6 +350,35 @@ doc() {
 
 
     echo -e "\t${YELLOW}GENERATED${RESET} docs for project under \`$name/docs/\`"
+}
+
+################################################################################
+# Adds dependencies to the project
+#
+# Arguments:
+#   ${@}: Dependencies and flags to add.
+################################################################################
+add() {
+    # Ensure command was run from project root
+    if [ $(in_root) -ne 1 ]; then
+        echo "Error: \"${PWD##*/}\" not a project root."
+        return
+    fi
+
+    # Add each dependency
+    for arg in "${@}"; do
+        case "$arg" in
+            "jfx" | "javafx") # Add JavaFX support
+                sed -i '/module/a requires javafx.controls;' src/$MODULE
+                ;;
+
+            *)
+                echo "Unsupported dependency \`$arg\`. Not yet implemented"
+                ;;
+        esac
+    done
+
+    echo -e "\t${YELLOW}ADDED${RESET} dependencies for project under \`$name/src/$MODULE\`"
 }
 
 ################################################################################
@@ -381,6 +431,47 @@ in_root() {
     echo $retval
 }
 
+################################################################################
+# Parses arguments supplied for the `java` and `javac` commands.
+#
+# Arguments:
+#   ${@}: List of arguments to be parsed.
+#
+# Returns
+#   A list of parsed arguments.
+#   The number of arguments parsed.
+################################################################################
+arg_parser() {
+    # Local variables for args and shifting
+    local shift_amt=0
+    local args=()
+
+    # Loop over every arg provided
+    for arg in ${@}; do
+        # If the arg is empty, ignore it
+        if [ -z "$arg" ]; then
+            continue
+        fi
+
+        # Parse the args
+        case "$arg" in
+            "--jfx" | "--fx") # Add JFX support
+                # Increase shift amount
+                shift_amt=$((shift_amt + 1))
+                args+=("--module-path $PATH_TO_FX --add-modules javafx.controls")
+                ;;
+
+            *) # No parsing needed
+                args+=("$arg")
+                shift_amt=$((shift_amt + 1))
+                ;;
+        esac
+    done
+
+    echo "${args[@]}"
+    return $shift_amt
+}
+
 # Check minimum args
 if [ $# -lt 1 ]; then
     usage
@@ -412,6 +503,11 @@ case $(echo $1 | tr '[:upper:]' '[:lower:]') in
     "doc" | "d") # Generate documentation for project
         shift
         doc ${@}
+        ;;
+
+    "add" | "d") # Adds dependencies to the project
+        shift
+        add ${@}
         ;;
 
     "--help" | "-h") # Display help menu
