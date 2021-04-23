@@ -78,6 +78,9 @@ See \`jargo help <COMMAND>\` for command-specific information"
 # Arguments:
 #   $1: Error code to exit with
 #   ${@}: List of files to remove
+#
+# Outputs:
+#   A message displaying what files are being removed
 ################################################################################
 shutdown() {
     # Debug printing
@@ -184,6 +187,9 @@ public class $driver {
      */
     public static void main(String[] args) {
         System.out.println(\"Hello, world!\");
+        for (String arg : args) {
+            System.out.println(arg);
+        }
     }
 }" > $name/src/$package/$driver.java
 
@@ -211,13 +217,13 @@ public class $driver {
 # Handles compilation of a project
 #
 # Outputs:
-#   A message displaying that the project was built.
+#   Possible output of an "already up to date" message
 #
 # Arguments:
 #   ${@}: All compilation arguments
 #
 # Returns:
-#   1 if compilation was successful, else 0
+#   0 if compilation was successful, else 1
 ################################################################################
 build() {
     local retval=0
@@ -231,29 +237,13 @@ build() {
 
     # Only recompile if needed
     if [ $(needs_rebuild) -eq 1 ]; then
-
-
         # Parse the args and shift
-        local args=$(arg_parser ${@})
+        args=$(arg_parser ${@})
         local shift_amt=$?
         shift $shift_amt
 
-        # Compile with new args
-        find src/ -name "*.java" -print | xargs javac ${args[@]} -d bin/
-
-        # Display compilation message if no errors occurred
-        if [ $? -eq 0 ]; then
-
-            # Display appropriate compilation message
-            if [ ${#args[@]} -gt 0 ]; then
-                echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${args[@]}"
-            else
-                echo -e "\t${YELLOW}COMPILED${RESET} $name"
-            fi
-
-            # Compilation success
-            retval=1
-        fi
+        compile ${args[@]}
+        retval=$?
     else
         echo "Project binaries are up to date."
         retval=1
@@ -284,30 +274,30 @@ run() {
     fi
 
     # By default, status is OK to run
-    local status=1
-
-    # If the project needs to be recompiled, do so.
-    if [ $(needs_rebuild) -eq 1 ]; then
-        build ${@}
-        status=$?
-    fi
+    local status=0
 
     # Parse the args and shift
-    local args=$(arg_parser ${@})
+    args=$(arg_parser ${@})
     local shift_amt=$?
     shift $shift_amt
 
+    # If the project needs to be recompiled, do so.
+    if [ $(needs_rebuild) -eq 1 ]; then
+        compile ${args[@]}
+        status=$?
+    fi
+
+
     # Only execute if compilation was successful
-    if [ $status -eq 1 ]; then
+    if [ $status -eq 0 ]; then
         if [ ${#args[@]} -gt 0 ]; then
-            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${args[@]}"
+            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${args[@]} ${@}"
         else
             echo -e "\t${YELLOW}EXECUTING${RESET} $name"
         fi
 
         # Execute driver with supplied args
-        # TODO: Allow user to supply args to the program
-        java ${args[@]} -cp bin/ $package.$driver
+        java ${args[@]} -cp bin/ $package.$driver ${@}
     fi
 }
 
@@ -357,6 +347,9 @@ doc() {
 #
 # Arguments:
 #   ${@}: Dependencies and flags to add.
+#
+# Outputs:
+#   A message declaring that a dependency was added
 ################################################################################
 add() {
     # Ensure command was run from project root
@@ -412,6 +405,32 @@ needs_rebuild() {
 }
 
 ################################################################################
+# Actually compiles the project.
+#
+# Returns:
+#   0 If program was compiled successfully
+################################################################################
+compile () {
+    # Compile with new args
+    find src/ -name "*.java" -print | xargs javac ${@} -d bin/
+    local retval=$?
+
+    # Display compilation message if no errors occurred
+    if [ $retval -eq 0 ]; then
+
+        # Display appropriate compilation message
+        if [ ${#args[@]} -gt 0 ] || [ ${#@} -gt 0 ]; then
+            echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${@}"
+        else
+            echo -e "\t${YELLOW}COMPILED${RESET} $name"
+        fi
+    fi
+
+    return $retval
+}
+
+
+################################################################################
 # Determines if `jargo` was run from a project's root.
 #
 # Globals:
@@ -462,8 +481,6 @@ arg_parser() {
                 ;;
 
             *) # No parsing needed
-                args+=("$arg")
-                shift_amt=$((shift_amt + 1))
                 ;;
         esac
     done
