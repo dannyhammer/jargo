@@ -69,8 +69,9 @@ COMMANDS:
     new, n              Create a new Java project
     build, b            Builds project, compiling classes if updates were made
     run, r              Runs the driver for this project
-    clean, c            Cleans working directory of *.class files
-    doc, d              Generate documentation files
+    clean               Cleans working directory of *.class files
+    doc                 Generate documentation files
+    add                 Add a dependency (only --jfx is support currently)
 
 See \`jargo help <COMMAND>\` for command-specific information"
 }
@@ -538,17 +539,17 @@ main () {
             run ${@}
             ;;
 
-        "clean" | "c") # Clean project
+        "clean") # Clean project
             shift
             clean ${@}
             ;;
 
-        "doc" | "d") # Generate documentation for project
+        "doc") # Generate documentation for project
             shift
             doc ${@}
             ;;
 
-        "add" | "d") # Adds dependencies to the project
+        "add") # Adds dependencies to the project
             shift
             add ${@}
             ;;

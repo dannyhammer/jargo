@@ -54,4 +54,7 @@ I'll put more in this section once I have this more fleshed out. But for now, he
 2. Mark it as executable by `chmod u+x jargo`
 3. Create a symlink so you can execute it anywhere `ln -s /path/to/jargo /usr/local/bin`
 
+If you want to use the `--jfx` flag when running or compiling, you need to have `$PATH_TO_FX` set in your shell's environment variables.
+This should be the path to the appropriate version of JavaFX's `lib/` folder.
+
 Of course, you need Java installed :)
