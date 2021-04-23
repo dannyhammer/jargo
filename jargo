@@ -50,7 +50,10 @@ else
 fi
 
 ################################################################################
-# Displays usage message
+# Displays usage message.
+#
+# Outputs:
+#   A usage message.
 ################################################################################
 usage() {
     echo "Simple Java Project Manager
@@ -73,11 +76,14 @@ See \`jargo help <COMMAND>\` for command-specific information"
 }
 
 ################################################################################
-# Handles graceful cleanup and shutdown
+# Handles graceful cleanup and shutdown.
 #
 # Arguments:
-#   $1: Error code to exit with
-#   ${@}: List of files to remove
+#   $1: Error code to exit with.
+#   ${@}: List of files to remove.
+#
+# Outputs:
+#   A message displaying what files are being removed.
 ################################################################################
 shutdown() {
     # Debug printing
@@ -98,18 +104,18 @@ shutdown() {
 }
 
 ################################################################################
-# Handles creation of new project
+# Handles creation of new project.
 #
 # Globals:
-#   name: Project directory name
-#   package: Package name where the driver resides
-#   driver: Name of the driver file
+#   name: Project directory name.
+#   package: Package name where the driver resides.
+#   driver: Name of the driver file.
 #
 # Outputs:
 #   A message displaying that the project was created.
 #
 # Arguments:
-#   $1: Name of project to create
+#   $1: Name of project to create.
 ################################################################################
 new() {
     # Initialize default configuration variables
@@ -208,73 +214,51 @@ public class $driver {
 }
 
 ################################################################################
-# Handles compilation of a project
-#
-# Outputs:
-#   A message displaying that the project was built.
+# Handles compilation of a project.
 #
 # Arguments:
-#   ${@}: All compilation arguments
+#   ${@}: All compilation arguments.
+#
+# Outputs:
+#   Possible output of an "already up to date" message.
 #
 # Returns:
-#   1 if compilation was successful, else 0
+#   0 if compilation was successful, else a non-zero error code.
 ################################################################################
 build() {
-    local retval=0
-
     # Ensure command was run from project root
     if [ $(in_root) -ne 1 ]; then
         echo "Error: \"${PWD##*/}\" not a project root."
-        echo $retval
-        return
+        return 1
     fi
 
     # Only recompile if needed
     if [ $(needs_rebuild) -eq 1 ]; then
-
-
         # Parse the args and shift
-        local args=$(arg_parser ${@})
-        local shift_amt=$?
-        shift $shift_amt
+        args=$(arg_parser ${@})
+        shift $?
 
-        # Compile with new args
-        find src/ -name "*.java" -print | xargs javac ${args[@]} -d bin/
-
-        # Display compilation message if no errors occurred
-        if [ $? -eq 0 ]; then
-
-            # Display appropriate compilation message
-            if [ ${#args[@]} -gt 0 ]; then
-                echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${args[@]}"
-            else
-                echo -e "\t${YELLOW}COMPILED${RESET} $name"
-            fi
-
-            # Compilation success
-            retval=1
-        fi
+        compile ${args[@]}
+        return=$?
     else
         echo "Project binaries are up to date."
-        retval=1
+        return 0
     fi
-
-    return $retval
 }
 
 ################################################################################
-# Handles execution of application
+# Handles execution of application.
 #
 # Globals:
-#   name: Project directory name
-#   package: Package name where the driver resides
-#   driver: Name of the driver file
+#   name: Project directory name.
+#   package: Package name where the driver resides.
+#   driver: Name of the driver file.
 # 
 # Outputs:
 #   A message displaying that the project was ran.
 #
 # Arguments:
-#   ${@}: All command line arguments passed by the user, to be sent to `main()`
+#   ${@}: All command line arguments passed by the user, to be sent to `main()`.
 ################################################################################
 run() {
     # Ensure command was run from project root
@@ -284,30 +268,30 @@ run() {
     fi
 
     # By default, status is OK to run
-    local status=1
-
-    # If the project needs to be recompiled, do so.
-    if [ $(needs_rebuild) -eq 1 ]; then
-        build ${@}
-        status=$?
-    fi
+    local status=0
 
     # Parse the args and shift
-    local args=$(arg_parser ${@})
+    args=$(arg_parser ${@})
     local shift_amt=$?
     shift $shift_amt
 
+    # If the project needs to be recompiled, do so.
+    if [ $(needs_rebuild) -eq 1 ]; then
+        compile ${args[@]}
+        status=$?
+    fi
+
+
     # Only execute if compilation was successful
-    if [ $status -eq 1 ]; then
+    if [ $status -eq 0 ]; then
         if [ ${#args[@]} -gt 0 ]; then
-            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${args[@]}"
+            echo -e "\t${YELLOW}EXECUTING${RESET} $name with args: ${args[@]} ${@}"
         else
             echo -e "\t${YELLOW}EXECUTING${RESET} $name"
         fi
 
         # Execute driver with supplied args
-        # TODO: Allow user to supply args to the program
-        java ${args[@]} -cp bin/ $package.$driver
+        java ${args[@]} -cp bin/ $package.$driver ${@}
     fi
 }
 
@@ -316,6 +300,9 @@ run() {
 # 
 # Outputs:
 #   A message displaying that the project was cleaned.
+#
+# Arguments:
+#   ${@}: Flags to clean additional directories.
 ################################################################################
 clean() {
     # Ensure command was run from project root
@@ -324,10 +311,13 @@ clean() {
         return
     fi
 
-    # Delete docs, if requested
-    if [ "$1" = "--doc" ] || [ "$1" = "-d" ]; then
-        rm -rf docs/*
-    fi
+    # Handle optional arguments
+    for arg in "${@}"; do
+        # Delete docs, if requested
+        if [ "$arg" = "--doc" ] || [ "$arg" = "-d" ]; then
+            rm -rf docs/*
+        fi
+    done
 
     # Recursively delete all *.class files in bin/
     find bin/ -name "*.class" -delete
@@ -336,7 +326,13 @@ clean() {
 }
 
 ################################################################################
-# Generates documentation for the project
+# Generates documentation for the project.
+#
+# Globals:
+#   name: Project root name.
+#
+# Outputs:
+#   A message stating that documentation was created.
 ################################################################################
 doc() {
     # Ensure command was run from project root
@@ -355,8 +351,15 @@ doc() {
 ################################################################################
 # Adds dependencies to the project
 #
+# Globals:
+#   name: Project root name.
+#   MODULE: Project module file.
+#
 # Arguments:
 #   ${@}: Dependencies and flags to add.
+#
+# Outputs:
+#   A message declaring that a dependency was added
 ################################################################################
 add() {
     # Ensure command was run from project root
@@ -412,10 +415,45 @@ needs_rebuild() {
 }
 
 ################################################################################
+# Actually compiles the project.
+#
+# Globals:
+#   name: Project root name.
+#
+# Outputs:
+#   A message displaying a successful compilation.
+#
+# Arguments:
+#   ${@}: List of arguments to compile with.
+#
+# Returns:
+#   0 If program was compiled successfully.
+################################################################################
+compile () {
+    # Compile with new args
+    find src/ -name "*.java" -print | xargs javac ${@} -d bin/
+    local retval=$?
+
+    # Display compilation message if no errors occurred
+    if [ $retval -eq 0 ]; then
+
+        # Display appropriate compilation message
+        if [ ${#args[@]} -gt 0 ] || [ ${#@} -gt 0 ]; then
+            echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${@}"
+        else
+            echo -e "\t${YELLOW}COMPILED${RESET} $name"
+        fi
+    fi
+
+    return $retval
+}
+
+
+################################################################################
 # Determines if `jargo` was run from a project's root.
 #
 # Globals:
-#   name: Ensure this command is being run from the project root
+#   name: Ensure this command is being run from the project root.
 #
 # Returns
 #   1 if ran from project root, else 0.
@@ -462,8 +500,6 @@ arg_parser() {
                 ;;
 
             *) # No parsing needed
-                args+=("$arg")
-                shift_amt=$((shift_amt + 1))
                 ;;
         esac
     done
@@ -472,54 +508,66 @@ arg_parser() {
     return $shift_amt
 }
 
-# Check minimum args
-if [ $# -lt 1 ]; then
-    usage
-    shutdown 1
-fi
-
-# Launch appropriate command
-case $(echo $1 | tr '[:upper:]' '[:lower:]') in
-    "new" | "n") # Create new project
-        shift
-        new ${@}
-        ;;
-
-    "build" | "b") # Compile project
-        shift
-        build ${@}
-        ;;
-
-    "run" | "r") # Run project
-        shift
-        run ${@}
-        ;;
-
-    "clean" | "c") # Clean project
-        shift
-        clean ${@}
-        ;;
-
-    "doc" | "d") # Generate documentation for project
-        shift
-        doc ${@}
-        ;;
-
-    "add" | "d") # Adds dependencies to the project
-        shift
-        add ${@}
-        ;;
-
-    "--help" | "-h") # Display help menu
-        shift
+################################################################################
+# Project Main Method.
+#
+# Arguments:
+#   ${@}: All command line arguments supplied by the user.
+################################################################################
+main () {
+    # Check minimum args
+    if [ $# -lt 1 ]; then
         usage
-        ;;
+        shutdown 1
+    fi
 
-    *) # Unknown arg
-        echo "Error: Unknown command \`$1\`"
-        shutdown 2
-        ;;
-esac
+    # Launch appropriate command
+    case $(echo $1 | tr '[:upper:]' '[:lower:]') in
+        "new" | "n") # Create new project
+            shift
+            new ${@}
+            ;;
+
+        "build" | "b") # Compile project
+            shift
+            build ${@}
+            ;;
+
+        "run" | "r") # Run project
+            shift
+            run ${@}
+            ;;
+
+        "clean" | "c") # Clean project
+            shift
+            clean ${@}
+            ;;
+
+        "doc" | "d") # Generate documentation for project
+            shift
+            doc ${@}
+            ;;
+
+        "add" | "d") # Adds dependencies to the project
+            shift
+            add ${@}
+            ;;
+
+        "--help" | "-h") # Display help menu
+            shift
+            usage
+            ;;
+
+        *) # Unknown arg
+            echo "Error: Unknown command \`$1\`"
+            shutdown 2
+            ;;
+    esac
+}
+
+
+# Execute main and exit with appropriate error code
+main ${@}
 
 # Program success
-exit 0
+exit $?
