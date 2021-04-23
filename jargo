@@ -67,6 +67,7 @@ OPTIONS:
 
 COMMANDS:
     new, n              Create a new Java project
+    init                Initialize an existing project as a Jargo project
     build, b            Builds project, compiling classes if updates were made
     run, r              Runs the driver for this project
     clean               Cleans working directory of *.class files
@@ -404,6 +405,12 @@ add() {
 #   A message declaring that the project was initialized.
 ################################################################################
 init() {
+    # Ensure command was not run from project root
+    if [ $(in_root) -eq 1 ]; then
+        echo "Error: \"${PWD##*/}\" is already a project root."
+        return
+    fi
+
     # Default to initializing a git repository
     local git=1
     

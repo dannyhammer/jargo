@@ -41,6 +41,7 @@ The basic syntax is `jargo [OPTIONS] [COMMANDS]`, which is quite similar to `car
 Here are a few of the basic commands and options:
 
 - `jargo new <PROJECT> [OPTIONS]` - Create and initialize a new Java project
+- `jargo init` - Initialize an existing project to be compatible with Jargo
 - `jargo build` - Compile the current project
 - `jargo run [ARGUMENTS]` - Execute the project with the supplied arguments, compiling if necessary
 - `jargo clean` - Removes all `*.class` files
