@@ -232,23 +232,11 @@ build() {
     # Only recompile if needed
     if [ $(needs_rebuild) -eq 1 ]; then
 
-        # Local variables for args and shifting
-        local shift_amt=-1
-        local args=()
 
-        echo INITIAL ${@}
-
-        while [ $shift_amt -ne 0 ]; do
-            # Fetch modified args from the parser
-            args+=($(arg_parser ${@}))
-
-            # Shift the args
-            shift_amt=$?
-            shift $shift_amt
-        done
-
-        #args=$(arg_parser ${@})
-        echo LEFTOVER ${@}
+        # Parse the args and shift
+        local args=$(arg_parser ${@})
+        local shift_amt=$?
+        shift $shift_amt
 
         # Compile with new args
         find src/ -name "*.java" -print | xargs javac ${args[@]} -d bin/
@@ -272,33 +260,6 @@ build() {
     fi
 
     return $retval
-}
-
-arg_parser () {
-
-    # Hold new argument list and shift amount
-    local args=()
-    local num=0
-
-    case "$1" in
-        "--jfx" | "--fx") # Add JFX support
-            # Consume the argument and increase the counter
-            shift 
-            num=$((num + 1))
-            args+=("--module-path $PATH_TO_FX --add-modules javafx.controls")
-            ;;
-
-        *) # No parsing needed, just check that it's not empty
-            if [ ! -z "$1" ]; then
-                args+=("$1")
-                num=$((num + 1))
-            fi
-            ;;
-    esac
-
-    echo "${args[@]}"
-
-    return $num
 }
 
 ################################################################################
@@ -331,18 +292,10 @@ run() {
         status=$?
     fi
 
-    # Local variables for args and shifting
-    local shift_amt=-1
-    local args=()
-
-    while [ $shift_amt -ne 0 ]; do
-        # Fetch modified args from the parser
-        args+=($(arg_parser ${@}))
-
-        # Shift the args
-        shift_amt=$?
-        shift $shift_amt
-    done
+    # Parse the args and shift
+    local args=$(arg_parser ${@})
+    local shift_amt=$?
+    shift $shift_amt
 
     # Only execute if compilation was successful
     if [ $status -eq 1 ]; then
@@ -353,7 +306,8 @@ run() {
         fi
 
         # Execute driver with supplied args
-        java -cp bin/ $package.$driver ${args[@]}
+        # TODO: Allow user to supply args to the program
+        java ${args[@]} -cp bin/ $package.$driver
     fi
 }
 
@@ -475,6 +429,47 @@ in_root() {
     fi
 
     echo $retval
+}
+
+################################################################################
+# Parses arguments supplied for the `java` and `javac` commands.
+#
+# Arguments:
+#   ${@}: List of arguments to be parsed.
+#
+# Returns
+#   A list of parsed arguments.
+#   The number of arguments parsed.
+################################################################################
+arg_parser() {
+    # Local variables for args and shifting
+    local shift_amt=0
+    local args=()
+
+    # Loop over every arg provided
+    for arg in ${@}; do
+        # If the arg is empty, ignore it
+        if [ -z "$arg" ]; then
+            continue
+        fi
+
+        # Parse the args
+        case "$arg" in
+            "--jfx" | "--fx") # Add JFX support
+                # Increase shift amount
+                shift_amt=$((shift_amt + 1))
+                args+=("--module-path $PATH_TO_FX --add-modules javafx.controls")
+                ;;
+
+            *) # No parsing needed
+                args+=("$arg")
+                shift_amt=$((shift_amt + 1))
+                ;;
+        esac
+    done
+
+    echo "${args[@]}"
+    return $shift_amt
 }
 
 # Check minimum args
