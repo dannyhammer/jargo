@@ -195,7 +195,10 @@ public class $driver {
 }" > $name/src/$package/$driver.java
 
     # Create module file
-    echo "module $name {
+    echo "/**
+ * Default module.
+ */
+module $name {
     
 }" > $name/src/$MODULE
 
@@ -439,7 +442,7 @@ compile () {
     if [ $retval -eq 0 ]; then
 
         # Display appropriate compilation message
-        if [ ${#args[@]} -gt 0 ] || [ ${#@} -gt 0 ]; then
+        if [ ${#@} -gt 0 ]; then
             echo -e "\t${YELLOW}COMPILED${RESET} $name with args: ${@}"
         else
             echo -e "\t${YELLOW}COMPILED${RESET} $name"
