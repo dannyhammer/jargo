@@ -8,6 +8,7 @@ A simplified way of managing Java projects
   - [Background](#background)
   - [Features](#features)
 - [Usage](#usage)
+- [Example](#example)
 - [Installation](#installation)
 
 ## Overview
