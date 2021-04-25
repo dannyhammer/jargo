@@ -47,6 +47,12 @@ Here are a few of the basic commands and options:
 - `jargo clean` - Removes all `*.class` files
 - `jargo doc` - Generate Javadocs for the current project
 
+## Example
+
+Below is an example usage to create a run a basic Hello World application.
+
+![An example usage](./assets/example.png)
+
 ## Installation
 
 I'll put more in this section once I have this more fleshed out. But for now, here's the steps:
