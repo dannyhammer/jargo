@@ -72,7 +72,7 @@ COMMANDS:
     run, r              Runs the driver for this project
     clean               Cleans working directory of *.class files
     doc                 Generate documentation files
-    add                 Add a dependency (only --jfx is support currently)
+    add                 Add a dependency (only javafx is support currently)
 
 See \`jargo help <COMMAND>\` for command-specific information"
 }
@@ -373,11 +373,20 @@ add() {
         return
     fi
 
+    if [ ${#@} -lt 1 ]; then
+        echo "usage: jargo add <dependency>"
+        return
+    fi
+
+    # Keep track of number of dependencies added
+    local added=0
+
     # Add each dependency
     for arg in "${@}"; do
         case "$arg" in
             "jfx" | "javafx") # Add JavaFX support
-                sed -i '/module/a requires javafx.controls;' src/$MODULE
+                sed -i "/module $name/a requires javafx.controls;" src/$MODULE
+                added=$((added + 1))
                 ;;
 
             *)
@@ -386,7 +395,9 @@ add() {
         esac
     done
 
-    echo -e "\t${YELLOW}ADDED${RESET} dependencies for project under \`$name/src/$MODULE\`"
+    if [ $added -ne 0 ]; then
+        echo -e "\t${YELLOW}ADDED${RESET} $added dependencies for project under \`$name/src/$MODULE\`"
+    fi
 }
 
 ################################################################################
