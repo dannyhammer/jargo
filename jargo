@@ -168,7 +168,8 @@ new() {
     mkdir -p $name/bin
 
     # Create configuration file
-    echo "name:$name
+    echo "# Configuration file for Jargo Project Manager (https://github.com/HammerAPI/jargo)
+name:$name
 package:$package
 driver:$driver" > $name/$CONFIG
 
@@ -449,7 +450,8 @@ init() {
     done
 
     # Create configuration file
-    echo "name:$name
+    echo "# Configuration file for Jargo Project Manager (https://github.com/HammerAPI/jargo)
+name:$name
 package:$package
 driver:$driver" > $CONFIG
 
