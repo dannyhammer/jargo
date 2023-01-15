@@ -347,8 +347,12 @@ doc() {
         return
     fi
 
+    # Need to pass in special args for JavaFX?
+    args=$(arg_parser ${@})
+    shift $?
+
     # Mute output when documenting, but display errors
-    find src/ -name "*.java" -print | xargs javadoc -d docs > /dev/null
+    find src/ -name "*.java" -print | xargs javadoc ${args[@]} -d docs > /dev/null
 
 
     echo -e "\t${YELLOW}GENERATED${RESET} docs for project under \`$name/docs/\`"
